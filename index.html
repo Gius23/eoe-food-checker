@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EoE Food Checker</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   :root {
     --green: #2e7d32; --green-bg: #e8f5e9;
@@ -83,22 +82,21 @@
 </div>
 
 <div class="card">
-  <strong>✍️ Inserisci a mano</strong>
-  <input type="text" id="barcodeInput" placeholder="Codice a barre (es. 8076809513388)" style="margin-top:8px">
-  <button class="btn-primary" onclick="lookupBarcode(document.getElementById('barcodeInput').value)">Cerca prodotto</button>
-  <div class="small-note" style="margin-top:12px">Prodotto non trovato o senza barcode? Incolla qui il testo degli ingredienti dall'etichetta:</div>
-  <textarea id="manualIngredients" placeholder="Es: Farina di grano, zucchero, uova, latte scremato in polvere... Contiene: glutine, latte, uova."></textarea>
-  <button class="btn-secondary" onclick="checkManualIngredients()">Controlla ingredienti</button>
+  <strong>📷 Scatta foto etichetta</strong>
+  <div class="small-note" style="margin-top:4px">Apre la fotocamera del telefono. La foto resta qui sotto, puoi zoomarla con le dita per leggerla mentre scrivi gli ingredienti.</div>
+  <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
+  <button class="btn-primary" style="margin-top:8px" onclick="document.getElementById('photoInput').click()">📷 Scatta foto</button>
+  <img id="labelPhoto" class="hidden" style="max-width:100%; border-radius:8px; margin-top:8px;">
+  <button class="btn-secondary hidden" id="removePhotoBtn" onclick="removePhoto()">✕ Rimuovi foto</button>
 
   <hr style="border:none; border-top:1px solid #eee; margin:16px 0">
 
-  <strong>📷 Oppure scansiona con la fotocamera</strong>
-  <div style="margin-top:8px">
-    <button class="btn-primary" onclick="startScanner()">Avvia fotocamera</button>
-    <div id="reader" class="hidden"></div>
-    <button class="btn-danger hidden" id="stopBtn" onclick="stopScanner()">Ferma fotocamera</button>
-    <div class="small-note">Inquadra il codice a barre nel riquadro, tienilo fermo: la lettura è automatica.</div>
-  </div>
+  <strong>✍️ Inserisci a mano</strong>
+  <input type="text" id="barcodeInput" placeholder="Codice a barre (es. 8076809513388)" style="margin-top:8px">
+  <button class="btn-primary" onclick="lookupBarcode(document.getElementById('barcodeInput').value)">Cerca prodotto</button>
+  <div class="small-note" style="margin-top:12px">Oppure scrivi/incolla qui il testo degli ingredienti dall'etichetta (guardando la foto sopra):</div>
+  <textarea id="manualIngredients" placeholder="Es: Farina di grano, zucchero, uova, latte scremato in polvere... Contiene: glutine, latte, uova."></textarea>
+  <button class="btn-secondary" onclick="checkManualIngredients()">Controlla ingredienti</button>
 </div>
 
 <div id="resultCard" class="result">
@@ -110,7 +108,7 @@
 </div>
 
 <div style="text-align:center; color:#bbb; font-size:0.75rem; margin-top:24px; padding-bottom:16px;">
-  Versione: 2026-08-03 14:32:54
+  Versione: 2026-08-03 14:39:44
 </div>
 
 <script>
@@ -125,7 +123,6 @@ const DEFAULT_TRIGGERS = [
 
 let activeTriggers = [];
 let customTriggers = [];
-let html5QrCode = null;
 
 function loadState() {
   const savedActive = localStorage.getItem('eoe_active_triggers');
@@ -193,60 +190,22 @@ function getActiveTermsMap() {
   return map;
 }
 
-const BARCODE_FORMATS = [
-  Html5QrcodeSupportedFormats.EAN_13,
-  Html5QrcodeSupportedFormats.EAN_8,
-  Html5QrcodeSupportedFormats.UPC_A,
-  Html5QrcodeSupportedFormats.UPC_E,
-  Html5QrcodeSupportedFormats.CODE_128,
-  Html5QrcodeSupportedFormats.QR_CODE,
-];
+document.getElementById('photoInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const img = document.getElementById('labelPhoto');
+  img.src = URL.createObjectURL(file);
+  img.classList.remove('hidden');
+  document.getElementById('removePhotoBtn').classList.remove('hidden');
+  document.getElementById('manualIngredients').focus();
+});
 
-function startScanner() {
-  const readerDiv = document.getElementById('reader');
-  readerDiv.classList.remove('hidden');
-  document.getElementById('stopBtn').classList.remove('hidden');
-  html5QrCode = new Html5Qrcode("reader", {
-    formatsToSupport: BARCODE_FORMATS,
-    verbose: false,
-  });
-  html5QrCode.start(
-    { facingMode: "environment" },
-    {
-      fps: 10,
-      qrbox: (viewfinderWidth, viewfinderHeight) => {
-        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-        const w = Math.floor(minEdge * 0.85);
-        const h = Math.floor(w * 0.45);
-        return { width: w, height: h };
-      },
-      videoConstraints: {
-        facingMode: "environment",
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        advanced: [{ focusMode: "continuous" }]
-      }
-    },
-    (decodedText) => {
-      lookupBarcode(decodedText);
-      stopScanner();
-    },
-    () => {}
-  ).catch(err => {
-    alert('Impossibile avviare la fotocamera: ' + err + '\n\nUsa "Inserisci a mano" come alternativa.');
-    readerDiv.classList.add('hidden');
-    document.getElementById('stopBtn').classList.add('hidden');
-  });
-}
-
-function stopScanner() {
-  if (!html5QrCode) return Promise.resolve();
-  return html5QrCode.stop().then(() => {
-    html5QrCode.clear();
-  }).catch(() => {}).finally(() => {
-    document.getElementById('reader').classList.add('hidden');
-    document.getElementById('stopBtn').classList.add('hidden');
-  });
+function removePhoto() {
+  const img = document.getElementById('labelPhoto');
+  img.classList.add('hidden');
+  img.src = '';
+  document.getElementById('removePhotoBtn').classList.add('hidden');
+  document.getElementById('photoInput').value = '';
 }
 
 async function lookupBarcode(code) {
