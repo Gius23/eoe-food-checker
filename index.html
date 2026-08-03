@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EoE Food Checker</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --green: #2e7d32; --green-bg: #e8f5e9;
+    --orange: #ef6c00; --orange-bg: #fff3e0;
+    --red: #c62828; --red-bg: #ffebee;
+    --gray: #757575; --border: #ddd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 480px; margin: 0 auto; padding: 16px; background: #fafafa; color: #222;
+  }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; }
+  .subtitle { color: var(--gray); font-size: 0.85rem; margin-bottom: 16px; }
+  .card {
+    background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  button {
+    font-size: 1rem; padding: 12px 16px; border-radius: 8px; border: none;
+    cursor: pointer; font-weight: 600; width: 100%; margin-bottom: 8px;
+  }
+  .btn-primary { background: #1565c0; color: white; }
+  .btn-secondary { background: #eee; color: #333; }
+  .btn-danger { background: var(--red-bg); color: var(--red); }
+  input[type=text], textarea {
+    width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 1rem; margin-bottom: 8px; font-family: inherit;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+  .trigger-list label {
+    display: flex; align-items: center; gap: 8px; padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0; font-size: 0.95rem;
+  }
+  .trigger-list label:last-child { border-bottom: none; }
+  .trigger-list input[type=checkbox] { width: 20px; height: 20px; }
+  .custom-triggers { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip {
+    background: #eee; border-radius: 16px; padding: 4px 10px; font-size: 0.85rem;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .chip button { width: auto; padding: 0; margin: 0; background: none; color: var(--gray); font-size: 1rem; line-height: 1; }
+  .result {
+    border-radius: 12px; padding: 16px; margin-top: 8px; display: none;
+  }
+  .result.show { display: block; }
+  .result.ok { background: var(--green-bg); border: 2px solid var(--green); }
+  .result.warn { background: var(--orange-bg); border: 2px solid var(--orange); }
+  .result.no { background: var(--red-bg); border: 2px solid var(--red); }
+  .result .light { font-size: 2rem; }
+  .result h3 { margin: 8px 0 4px; }
+  .result .detail { font-size: 0.9rem; margin-top: 8px; white-space: pre-line; }
+  .result .product-name { font-weight: 600; margin-bottom: 4px; }
+  .hidden { display: none; }
+  .tab-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tab-bar button { margin-bottom: 0; }
+  .tab-bar .inactive { background: #eee; color: #666; }
+  .tab-bar .active { background: #1565c0; color: white; }
+  .small-note { font-size: 0.8rem; color: var(--gray); margin-top: 4px; }
+  #ingredientsText { font-size: 0.85rem; color: #555; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>🍽️ EoE Food Checker</h1>
+<div class="subtitle">Controlla se un prodotto è compatibile con i tuoi trigger (esofagite eosinofila)</div>
+
+<div class="card">
+  <strong>I tuoi alimenti da evitare</strong>
+  <div class="trigger-list" id="triggerList"></div>
+  <div class="small-note">Base: i 6 gruppi standard della dieta di eliminazione EoE. Deseleziona quelli che NON sono tuoi trigger, o aggiungine altri sotto.</div>
+  <input type="text" id="customTriggerInput" placeholder="Aggiungi un trigger personalizzato (es. mais)">
+  <button class="btn-secondary" onclick="addCustomTrigger()">+ Aggiungi</button>
+  <div class="custom-triggers" id="customTriggers"></div>
+</div>
+
+<div class="card">
+  <div class="tab-bar">
+    <button id="tabScanBtn" class="active" onclick="switchTab('scan')">📷 Scansiona Barcode</button>
+    <button id="tabManualBtn" class="inactive" onclick="switchTab('manual')">✍️ Inserisci a mano</button>
+  </div>
+
+  <div id="scanTab">
+    <button class="btn-primary" onclick="startScanner()">Avvia fotocamera</button>
+    <div id="reader" class="hidden"></div>
+    <button class="btn-danger hidden" id="stopBtn" onclick="stopScanner()">Ferma fotocamera</button>
+    <div class="small-note">Inquadra il codice a barre del prodotto. Richiede permesso fotocamera (funziona meglio su HTTPS o localhost).</div>
+  </div>
+
+  <div id="manualTab" class="hidden">
+    <input type="text" id="barcodeInput" placeholder="Codice a barre (es. 8076809513388)">
+    <button class="btn-primary" onclick="lookupBarcode(document.getElementById('barcodeInput').value)">Cerca prodotto</button>
+    <div class="small-note" style="margin-top:12px">Prodotto non trovato o senza barcode? Incolla qui il testo degli ingredienti dall'etichetta:</div>
+    <textarea id="manualIngredients" placeholder="Es: Farina di grano, zucchero, uova, latte scremato in polvere... Contiene: glutine, latte, uova."></textarea>
+    <button class="btn-secondary" onclick="checkManualIngredients()">Controlla ingredienti</button>
+  </div>
+</div>
+
+<div id="resultCard" class="result">
+  <div class="light" id="resultLight"></div>
+  <div class="product-name" id="resultProduct"></div>
+  <h3 id="resultTitle"></h3>
+  <div class="detail" id="resultDetail"></div>
+  <div id="ingredientsText"></div>
+</div>
+
+<script>
+const DEFAULT_TRIGGERS = [
+  { id: 'latte', label: 'Latte / latticini', terms: ['latte','siero di latte','caseina','caseinato','lattosio','burro','panna','yogurt','formaggio','ghi','burro chiarificato','latticello'] },
+  { id: 'grano', label: 'Grano / glutine', terms: ['grano','farina di grano','frumento','semola','glutine','malto','amido di grano','orzo','segale','farina 00','farina di frumento'] },
+  { id: 'uovo', label: 'Uovo', terms: ['uovo','uova','albume','tuorlo','ovoalbumina','lisozima','lecitina d\'uovo','lecitina di uovo'] },
+  { id: 'soia', label: 'Soia', terms: ['soia','lecitina di soia','proteine di soia','tofu','farina di soia','olio di soia','edamame'] },
+  { id: 'fruttaguscio', label: 'Frutta a guscio', terms: ['mandorle','nocciole','noci','anacardi','pistacchi','arachidi','pinoli','noce pecan','macadamia','frutta a guscio','frutta secca a guscio'] },
+  { id: 'pesce', label: 'Pesce / crostacei', terms: ['pesce','tonno','salmone','acciughe','gelatina di pesce','crostacei','molluschi bivalvi','gamberi','gambero','granchio','calamari','molluschi','merluzzo'] },
+];
+
+let activeTriggers = [];
+let customTriggers = [];
+let html5QrCode = null;
+
+function loadState() {
+  const savedActive = localStorage.getItem('eoe_active_triggers');
+  const savedCustom = localStorage.getItem('eoe_custom_triggers');
+  activeTriggers = savedActive ? JSON.parse(savedActive) : DEFAULT_TRIGGERS.map(t => t.id);
+  customTriggers = savedCustom ? JSON.parse(savedCustom) : [];
+}
+
+function saveState() {
+  localStorage.setItem('eoe_active_triggers', JSON.stringify(activeTriggers));
+  localStorage.setItem('eoe_custom_triggers', JSON.stringify(customTriggers));
+}
+
+function renderTriggerList() {
+  const container = document.getElementById('triggerList');
+  container.innerHTML = '';
+  DEFAULT_TRIGGERS.forEach(t => {
+    const label = document.createElement('label');
+    const checked = activeTriggers.includes(t.id) ? 'checked' : '';
+    label.innerHTML = `<input type="checkbox" data-id="${t.id}" ${checked}> ${t.label}`;
+    label.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) {
+        if (!activeTriggers.includes(t.id)) activeTriggers.push(t.id);
+      } else {
+        activeTriggers = activeTriggers.filter(id => id !== t.id);
+      }
+      saveState();
+    });
+    container.appendChild(label);
+  });
+
+  const chipsContainer = document.getElementById('customTriggers');
+  chipsContainer.innerHTML = '';
+  customTriggers.forEach((term, idx) => {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.innerHTML = `${term} <button onclick="removeCustomTrigger(${idx})">✕</button>`;
+    chipsContainer.appendChild(chip);
+  });
+}
+
+function addCustomTrigger() {
+  const input = document.getElementById('customTriggerInput');
+  const val = input.value.trim().toLowerCase();
+  if (val && !customTriggers.includes(val)) {
+    customTriggers.push(val);
+    saveState();
+    renderTriggerList();
+  }
+  input.value = '';
+}
+
+function removeCustomTrigger(idx) {
+  customTriggers.splice(idx, 1);
+  saveState();
+  renderTriggerList();
+}
+
+function getActiveTermsMap() {
+  const map = {};
+  DEFAULT_TRIGGERS.forEach(t => {
+    if (activeTriggers.includes(t.id)) map[t.label] = t.terms;
+  });
+  customTriggers.forEach(term => { map[term] = [term]; });
+  return map;
+}
+
+function switchTab(tab) {
+  document.getElementById('scanTab').classList.toggle('hidden', tab !== 'scan');
+  document.getElementById('manualTab').classList.toggle('hidden', tab !== 'manual');
+  document.getElementById('tabScanBtn').className = tab === 'scan' ? 'active' : 'inactive';
+  document.getElementById('tabManualBtn').className = tab === 'manual' ? 'active' : 'inactive';
+  if (tab !== 'scan') stopScanner();
+}
+
+function startScanner() {
+  const readerDiv = document.getElementById('reader');
+  readerDiv.classList.remove('hidden');
+  document.getElementById('stopBtn').classList.remove('hidden');
+  html5QrCode = new Html5Qrcode("reader");
+  html5QrCode.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: 250 },
+    (decodedText) => {
+      lookupBarcode(decodedText);
+      stopScanner();
+    },
+    () => {}
+  ).catch(err => {
+    alert('Impossibile avviare la fotocamera: ' + err + '\n\nUsa "Inserisci a mano" come alternativa.');
+    readerDiv.classList.add('hidden');
+    document.getElementById('stopBtn').classList.add('hidden');
+  });
+}
+
+function stopScanner() {
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => {
+      html5QrCode.clear();
+      document.getElementById('reader').classList.add('hidden');
+      document.getElementById('stopBtn').classList.add('hidden');
+    }).catch(() => {});
+  }
+}
+
+async function lookupBarcode(code) {
+  code = (code || '').trim();
+  if (!code) return;
+  showLoading();
+  try {
+    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json`);
+    const data = await res.json();
+    if (data.status !== 1 || !data.product) {
+      showNotFound(code);
+      return;
+    }
+    const product = data.product;
+    const name = product.product_name || product.product_name_it || '(nome non disponibile)';
+    const ingredientsText = product.ingredients_text_it || product.ingredients_text || '';
+    const allergensText = product.allergens || '';
+    const tracesText = product.traces || '';
+    evaluateAndShow(name, ingredientsText, allergensText, tracesText);
+  } catch (e) {
+    alert('Errore nella ricerca del prodotto: ' + e.message);
+    hideResult();
+  }
+}
+
+function splitFreeText(text) {
+  const tracesMatch = text.match(/tracc(?:e|ia) di ([^.\n]*)/i);
+  let ingredientsText = text;
+  let tracesText = '';
+  if (tracesMatch) {
+    tracesText = tracesMatch[1];
+    ingredientsText = text.replace(tracesMatch[0], '');
+  }
+  return { ingredientsText, tracesText };
+}
+
+function checkManualIngredients() {
+  const text = document.getElementById('manualIngredients').value.trim();
+  if (!text) { alert('Incolla il testo degli ingredienti prima di controllare.'); return; }
+  const { ingredientsText, tracesText } = splitFreeText(text);
+  evaluateAndShow('Prodotto inserito manualmente', ingredientsText, '', tracesText);
+}
+
+function showLoading() {
+  const card = document.getElementById('resultCard');
+  card.className = 'result show';
+  document.getElementById('resultLight').textContent = '⏳';
+  document.getElementById('resultProduct').textContent = '';
+  document.getElementById('resultTitle').textContent = 'Ricerca in corso...';
+  document.getElementById('resultDetail').textContent = '';
+  document.getElementById('ingredientsText').textContent = '';
+}
+
+function showNotFound(code) {
+  const card = document.getElementById('resultCard');
+  card.className = 'result show warn';
+  document.getElementById('resultLight').textContent = '🟠';
+  document.getElementById('resultProduct').textContent = '';
+  document.getElementById('resultTitle').textContent = 'Prodotto non trovato';
+  document.getElementById('resultDetail').textContent = `Il codice ${code} non è nel database Open Food Facts. Usa "Inserisci a mano" per incollare gli ingredienti dall'etichetta.`;
+  document.getElementById('ingredientsText').textContent = '';
+}
+
+function hideResult() {
+  document.getElementById('resultCard').className = 'result';
+}
+
+function normalize(s) {
+  return (s || '').toLowerCase()
+    .replace(/[àáâä]/g,'a').replace(/[èéêë]/g,'e').replace(/[ìíîï]/g,'i')
+    .replace(/[òóôö]/g,'o').replace(/[ùúûü]/g,'u');
+}
+
+function evaluateAndShow(productName, ingredientsText, allergensText, tracesText) {
+  const termsMap = getActiveTermsMap();
+  const normIngredients = normalize(ingredientsText);
+  const normAllergens = normalize(allergensText);
+  const normTraces = normalize(tracesText);
+
+  let redMatches = [];
+  let orangeMatches = [];
+
+  for (const [label, terms] of Object.entries(termsMap)) {
+    let foundInContains = terms.some(term => normAllergens.includes(normalize(term)));
+    let foundInTraces = terms.some(term => normTraces.includes(normalize(term)));
+    let foundInIngredients = terms.some(term => normIngredients.includes(normalize(term)));
+
+    if (foundInContains || foundInIngredients) {
+      redMatches.push(label);
+    } else if (foundInTraces) {
+      orangeMatches.push(label);
+    }
+  }
+
+  const card = document.getElementById('resultCard');
+  document.getElementById('resultProduct').textContent = productName;
+
+  if (redMatches.length > 0) {
+    card.className = 'result show no';
+    document.getElementById('resultLight').textContent = '🔴';
+    document.getElementById('resultTitle').textContent = 'Da evitare';
+    document.getElementById('resultDetail').textContent =
+      `Contiene: ${redMatches.join(', ')}` +
+      (orangeMatches.length ? `\nInoltre possibile traccia di: ${orangeMatches.join(', ')}` : '');
+  } else if (orangeMatches.length > 0) {
+    card.className = 'result show warn';
+    document.getElementById('resultLight').textContent = '🟠';
+    document.getElementById('resultTitle').textContent = 'Attenzione — possibile traccia';
+    document.getElementById('resultDetail').textContent = `Possibile traccia di: ${orangeMatches.join(', ')}\nValuta con cautela in base alla tua sensibilità.`;
+  } else {
+    card.className = 'result show ok';
+    document.getElementById('resultLight').textContent = '🟢';
+    document.getElementById('resultTitle').textContent = 'OK';
+    document.getElementById('resultDetail').textContent = 'Nessuno dei tuoi trigger trovato negli ingredienti o allergeni dichiarati.';
+  }
+
+  document.getElementById('ingredientsText').textContent = ingredientsText ? `Ingredienti: ${ingredientsText}` : '';
+}
+
+loadState();
+renderTriggerList();
+</script>
+
+</body>
+</html>
