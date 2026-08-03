@@ -216,12 +216,7 @@ function startScanner() {
     verbose: false,
   });
   html5QrCode.start(
-    {
-      facingMode: "environment",
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-      advanced: [{ focusMode: "continuous" }]
-    },
+    { facingMode: "environment" },
     {
       fps: 10,
       qrbox: (viewfinderWidth, viewfinderHeight) => {
@@ -229,6 +224,12 @@ function startScanner() {
         const w = Math.floor(minEdge * 0.85);
         const h = Math.floor(w * 0.45);
         return { width: w, height: h };
+      },
+      videoConstraints: {
+        facingMode: "environment",
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        advanced: [{ focusMode: "continuous" }]
       }
     },
     (decodedText) => {
