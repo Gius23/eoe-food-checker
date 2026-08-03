@@ -91,6 +91,7 @@
   <div id="scanTab">
     <button class="btn-primary" onclick="startScanner()">Avvia fotocamera</button>
     <div id="reader" class="hidden"></div>
+    <div id="fileScanContainer" class="hidden"></div>
     <button class="btn-primary hidden" id="captureBtn" onclick="captureAndDecode()">📸 Scatta e decodifica</button>
     <button class="btn-danger hidden" id="stopBtn" onclick="stopScanner()">Ferma fotocamera</button>
     <div class="small-note">Inquadra bene il codice a barre nel riquadro, aspetta che sia a fuoco, poi tocca "Scatta e decodifica".</div>
@@ -275,23 +276,29 @@ async function captureAndDecode() {
 
   await stopScanner();
 
-  const readerDiv = document.getElementById('reader');
-  readerDiv.classList.remove('hidden');
   showLoading();
   document.getElementById('resultTitle').textContent = 'Decodifica foto in corso...';
 
-  const fileScanner = new Html5Qrcode("reader", {
+  const scanContainer = document.getElementById('fileScanContainer');
+  scanContainer.classList.remove('hidden');
+  scanContainer.innerHTML = '';
+
+  const fileScanner = new Html5Qrcode("fileScanContainer", {
     formatsToSupport: BARCODE_FORMATS,
     verbose: false,
   });
+  const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
   try {
-    const decodedText = await fileScanner.scanFile(file, false);
-    await fileScanner.clear();
-    readerDiv.classList.add('hidden');
+    const decodedText = await Promise.race([
+      fileScanner.scanFile(file, false),
+      timeout(8000)
+    ]);
+    await fileScanner.clear().catch(() => {});
+    scanContainer.classList.add('hidden');
     lookupBarcode(decodedText);
   } catch (err) {
-    await fileScanner.clear().catch(() => {});
-    readerDiv.classList.add('hidden');
+    fileScanner.clear().catch(() => {});
+    scanContainer.classList.add('hidden');
     hideResult();
     alert('Non sono riuscito a leggere il barcode dalla foto. Riprova tenendo il codice ben dritto, a fuoco e senza riflessi, oppure usa "Inserisci a mano".');
   }
