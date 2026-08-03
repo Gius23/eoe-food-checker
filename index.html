@@ -108,17 +108,23 @@
 </div>
 
 <div style="text-align:center; color:#bbb; font-size:0.75rem; margin-top:24px; padding-bottom:16px;">
-  Versione: 2026-08-03 14:39:44
+  Versione: 2026-08-03 14:52:18
 </div>
 
 <script>
 const DEFAULT_TRIGGERS = [
-  { id: 'latte', label: 'Latte / latticini', terms: ['latte','siero di latte','caseina','caseinato','lattosio','burro','panna','yogurt','formaggio','ghi','burro chiarificato','latticello'] },
-  { id: 'grano', label: 'Grano / glutine', terms: ['grano','farina di grano','frumento','semola','glutine','malto','amido di grano','orzo','segale','farina 00','farina di frumento'] },
-  { id: 'uovo', label: 'Uovo', terms: ['uovo','uova','albume','tuorlo','ovoalbumina','lisozima','lecitina d\'uovo','lecitina di uovo'] },
-  { id: 'soia', label: 'Soia', terms: ['soia','lecitina di soia','proteine di soia','tofu','farina di soia','olio di soia','edamame'] },
-  { id: 'fruttaguscio', label: 'Frutta a guscio', terms: ['mandorle','nocciole','noci','anacardi','pistacchi','arachidi','pinoli','noce pecan','macadamia','frutta a guscio','frutta secca a guscio'] },
-  { id: 'pesce', label: 'Pesce / crostacei', terms: ['pesce','tonno','salmone','acciughe','gelatina di pesce','crostacei','molluschi bivalvi','gamberi','gambero','granchio','calamari','molluschi','merluzzo'] },
+  { id: 'latte', label: 'Latte / latticini', terms: ['latte','siero di latte','caseina','caseinato','lattosio','burro','panna','yogurt','formaggio','ghi','burro chiarificato','latticello',
+      'milk','whey','casein','caseinate','lactose','butter','cream','cheese','buttermilk','dairy'] },
+  { id: 'grano', label: 'Grano / glutine', terms: ['grano','farina di grano','frumento','semola','glutine','malto','amido di grano','orzo','segale','farina 00','farina di frumento',
+      'wheat','gluten','malt','barley','rye','wheat flour'] },
+  { id: 'uovo', label: 'Uovo', terms: ['uovo','uova','albume','tuorlo','ovoalbumina','lisozima','lecitina d\'uovo','lecitina di uovo',
+      'egg','eggs','albumen','egg yolk','ovalbumin','lysozyme'] },
+  { id: 'soia', label: 'Soia', terms: ['soia','lecitina di soia','proteine di soia','tofu','farina di soia','olio di soia','edamame',
+      'soy','soya','soybean','soybeans','soy lecithin','soy protein'] },
+  { id: 'fruttaguscio', label: 'Frutta a guscio', terms: ['mandorle','nocciole','noci','anacardi','pistacchi','arachidi','pinoli','noce pecan','macadamia','frutta a guscio','frutta secca a guscio',
+      'almonds','hazelnuts','walnuts','cashews','pistachios','peanuts','pine nuts','pecan','macadamia','tree nuts','nuts'] },
+  { id: 'pesce', label: 'Pesce / crostacei', terms: ['pesce','tonno','salmone','acciughe','gelatina di pesce','crostacei','molluschi bivalvi','gamberi','gambero','granchio','calamari','molluschi','merluzzo',
+      'fish','tuna','salmon','anchovies','crustaceans','shellfish','shrimp','prawns','crab','squid','molluscs','cod'] },
 ];
 
 let activeTriggers = [];
