@@ -83,26 +83,21 @@
 </div>
 
 <div class="card">
-  <div class="tab-bar">
-    <button id="tabScanBtn" class="active" onclick="switchTab('scan')">📷 Scansiona Barcode</button>
-    <button id="tabManualBtn" class="inactive" onclick="switchTab('manual')">✍️ Inserisci a mano</button>
-  </div>
+  <strong>✍️ Inserisci a mano</strong>
+  <input type="text" id="barcodeInput" placeholder="Codice a barre (es. 8076809513388)" style="margin-top:8px">
+  <button class="btn-primary" onclick="lookupBarcode(document.getElementById('barcodeInput').value)">Cerca prodotto</button>
+  <div class="small-note" style="margin-top:12px">Prodotto non trovato o senza barcode? Incolla qui il testo degli ingredienti dall'etichetta:</div>
+  <textarea id="manualIngredients" placeholder="Es: Farina di grano, zucchero, uova, latte scremato in polvere... Contiene: glutine, latte, uova."></textarea>
+  <button class="btn-secondary" onclick="checkManualIngredients()">Controlla ingredienti</button>
 
-  <div id="scanTab">
+  <hr style="border:none; border-top:1px solid #eee; margin:16px 0">
+
+  <strong>📷 Oppure scansiona con la fotocamera</strong>
+  <div style="margin-top:8px">
     <button class="btn-primary" onclick="startScanner()">Avvia fotocamera</button>
     <div id="reader" class="hidden"></div>
-    <div id="fileScanContainer" class="hidden"></div>
-    <button class="btn-primary hidden" id="captureBtn" onclick="captureAndDecode()">📸 Scatta e decodifica</button>
     <button class="btn-danger hidden" id="stopBtn" onclick="stopScanner()">Ferma fotocamera</button>
-    <div class="small-note">Inquadra bene il codice a barre nel riquadro, aspetta che sia a fuoco, poi tocca "Scatta e decodifica".</div>
-  </div>
-
-  <div id="manualTab" class="hidden">
-    <input type="text" id="barcodeInput" placeholder="Codice a barre (es. 8076809513388)">
-    <button class="btn-primary" onclick="lookupBarcode(document.getElementById('barcodeInput').value)">Cerca prodotto</button>
-    <div class="small-note" style="margin-top:12px">Prodotto non trovato o senza barcode? Incolla qui il testo degli ingredienti dall'etichetta:</div>
-    <textarea id="manualIngredients" placeholder="Es: Farina di grano, zucchero, uova, latte scremato in polvere... Contiene: glutine, latte, uova."></textarea>
-    <button class="btn-secondary" onclick="checkManualIngredients()">Controlla ingredienti</button>
+    <div class="small-note">Inquadra il codice a barre nel riquadro, tienilo fermo: la lettura è automatica.</div>
   </div>
 </div>
 
@@ -115,7 +110,7 @@
 </div>
 
 <div style="text-align:center; color:#bbb; font-size:0.75rem; margin-top:24px; padding-bottom:16px;">
-  Versione: 2026-08-03 14:25:10
+  Versione: 2026-08-03 14:32:54
 </div>
 
 <script>
@@ -198,14 +193,6 @@ function getActiveTermsMap() {
   return map;
 }
 
-function switchTab(tab) {
-  document.getElementById('scanTab').classList.toggle('hidden', tab !== 'scan');
-  document.getElementById('manualTab').classList.toggle('hidden', tab !== 'manual');
-  document.getElementById('tabScanBtn').className = tab === 'scan' ? 'active' : 'inactive';
-  document.getElementById('tabManualBtn').className = tab === 'manual' ? 'active' : 'inactive';
-  if (tab !== 'scan') stopScanner();
-}
-
 const BARCODE_FORMATS = [
   Html5QrcodeSupportedFormats.EAN_13,
   Html5QrcodeSupportedFormats.EAN_8,
@@ -219,7 +206,6 @@ function startScanner() {
   const readerDiv = document.getElementById('reader');
   readerDiv.classList.remove('hidden');
   document.getElementById('stopBtn').classList.remove('hidden');
-  document.getElementById('captureBtn').classList.remove('hidden');
   html5QrCode = new Html5Qrcode("reader", {
     formatsToSupport: BARCODE_FORMATS,
     verbose: false,
@@ -250,7 +236,6 @@ function startScanner() {
     alert('Impossibile avviare la fotocamera: ' + err + '\n\nUsa "Inserisci a mano" come alternativa.');
     readerDiv.classList.add('hidden');
     document.getElementById('stopBtn').classList.add('hidden');
-    document.getElementById('captureBtn').classList.add('hidden');
   });
 }
 
@@ -261,51 +246,7 @@ function stopScanner() {
   }).catch(() => {}).finally(() => {
     document.getElementById('reader').classList.add('hidden');
     document.getElementById('stopBtn').classList.add('hidden');
-    document.getElementById('captureBtn').classList.add('hidden');
   });
-}
-
-async function captureAndDecode() {
-  const videoElem = document.querySelector('#reader video');
-  if (!videoElem || !videoElem.videoWidth) {
-    alert('Fotocamera non pronta, attendi un istante e riprova.');
-    return;
-  }
-  const canvas = document.createElement('canvas');
-  canvas.width = videoElem.videoWidth;
-  canvas.height = videoElem.videoHeight;
-  canvas.getContext('2d').drawImage(videoElem, 0, 0, canvas.width, canvas.height);
-  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
-  const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
-
-  await stopScanner();
-
-  showLoading();
-  document.getElementById('resultTitle').textContent = 'Decodifica foto in corso...';
-
-  const scanContainer = document.getElementById('fileScanContainer');
-  scanContainer.classList.remove('hidden');
-  scanContainer.innerHTML = '';
-
-  const fileScanner = new Html5Qrcode("fileScanContainer", {
-    formatsToSupport: BARCODE_FORMATS,
-    verbose: false,
-  });
-  const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
-  try {
-    const decodedText = await Promise.race([
-      fileScanner.scanFile(file, false),
-      timeout(8000)
-    ]);
-    await fileScanner.clear().catch(() => {});
-    scanContainer.classList.add('hidden');
-    lookupBarcode(decodedText);
-  } catch (err) {
-    fileScanner.clear().catch(() => {});
-    scanContainer.classList.add('hidden');
-    hideResult();
-    alert('Non sono riuscito a leggere il barcode dalla foto. Riprova tenendo il codice ben dritto, a fuoco e senza riflessi, oppure usa "Inserisci a mano".');
-  }
 }
 
 async function lookupBarcode(code) {
