@@ -92,7 +92,7 @@
     <button class="btn-primary" onclick="startScanner()">Avvia fotocamera</button>
     <div id="reader" class="hidden"></div>
     <button class="btn-danger hidden" id="stopBtn" onclick="stopScanner()">Ferma fotocamera</button>
-    <div class="small-note">Inquadra il codice a barre orizzontalmente dentro il riquadro, a circa 10-15 cm di distanza, con buona luce. Richiede permesso fotocamera.</div>
+    <div class="small-note">Inquadra il codice a barre orizzontalmente dentro il riquadro, a circa 20-25 cm di distanza (non troppo vicino), con buona luce. Tieni fermo il telefono un paio di secondi per far mettere a fuoco.</div>
   </div>
 
   <div id="manualTab" class="hidden">
@@ -218,11 +218,12 @@ function startScanner() {
   html5QrCode.start(
     {
       facingMode: "environment",
-      width: { min: 640, ideal: 1920, max: 2560 },
-      height: { min: 480, ideal: 1080, max: 1440 }
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      advanced: [{ focusMode: "continuous" }]
     },
     {
-      fps: 15,
+      fps: 10,
       qrbox: (viewfinderWidth, viewfinderHeight) => {
         const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
         const w = Math.floor(minEdge * 0.85);
