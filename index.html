@@ -91,8 +91,9 @@
   <div id="scanTab">
     <button class="btn-primary" onclick="startScanner()">Avvia fotocamera</button>
     <div id="reader" class="hidden"></div>
+    <button class="btn-primary hidden" id="captureBtn" onclick="captureAndDecode()">📸 Scatta e decodifica</button>
     <button class="btn-danger hidden" id="stopBtn" onclick="stopScanner()">Ferma fotocamera</button>
-    <div class="small-note">Inquadra il codice a barre orizzontalmente dentro il riquadro, a circa 20-25 cm di distanza (non troppo vicino), con buona luce. Tieni fermo il telefono un paio di secondi per far mettere a fuoco.</div>
+    <div class="small-note">Inquadra bene il codice a barre nel riquadro, aspetta che sia a fuoco, poi tocca "Scatta e decodifica".</div>
   </div>
 
   <div id="manualTab" class="hidden">
@@ -200,19 +201,22 @@ function switchTab(tab) {
   if (tab !== 'scan') stopScanner();
 }
 
+const BARCODE_FORMATS = [
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.QR_CODE,
+];
+
 function startScanner() {
   const readerDiv = document.getElementById('reader');
   readerDiv.classList.remove('hidden');
   document.getElementById('stopBtn').classList.remove('hidden');
+  document.getElementById('captureBtn').classList.remove('hidden');
   html5QrCode = new Html5Qrcode("reader", {
-    formatsToSupport: [
-      Html5QrcodeSupportedFormats.EAN_13,
-      Html5QrcodeSupportedFormats.EAN_8,
-      Html5QrcodeSupportedFormats.UPC_A,
-      Html5QrcodeSupportedFormats.UPC_E,
-      Html5QrcodeSupportedFormats.CODE_128,
-      Html5QrcodeSupportedFormats.QR_CODE,
-    ],
+    formatsToSupport: BARCODE_FORMATS,
     verbose: false,
   });
   html5QrCode.start(
@@ -227,8 +231,8 @@ function startScanner() {
       },
       videoConstraints: {
         facingMode: "environment",
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
         advanced: [{ focusMode: "continuous" }]
       }
     },
@@ -241,16 +245,55 @@ function startScanner() {
     alert('Impossibile avviare la fotocamera: ' + err + '\n\nUsa "Inserisci a mano" come alternativa.');
     readerDiv.classList.add('hidden');
     document.getElementById('stopBtn').classList.add('hidden');
+    document.getElementById('captureBtn').classList.add('hidden');
   });
 }
 
 function stopScanner() {
-  if (html5QrCode) {
-    html5QrCode.stop().then(() => {
-      html5QrCode.clear();
-      document.getElementById('reader').classList.add('hidden');
-      document.getElementById('stopBtn').classList.add('hidden');
-    }).catch(() => {});
+  if (!html5QrCode) return Promise.resolve();
+  return html5QrCode.stop().then(() => {
+    html5QrCode.clear();
+  }).catch(() => {}).finally(() => {
+    document.getElementById('reader').classList.add('hidden');
+    document.getElementById('stopBtn').classList.add('hidden');
+    document.getElementById('captureBtn').classList.add('hidden');
+  });
+}
+
+async function captureAndDecode() {
+  const videoElem = document.querySelector('#reader video');
+  if (!videoElem || !videoElem.videoWidth) {
+    alert('Fotocamera non pronta, attendi un istante e riprova.');
+    return;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = videoElem.videoWidth;
+  canvas.height = videoElem.videoHeight;
+  canvas.getContext('2d').drawImage(videoElem, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+  const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
+
+  await stopScanner();
+
+  const readerDiv = document.getElementById('reader');
+  readerDiv.classList.remove('hidden');
+  showLoading();
+  document.getElementById('resultTitle').textContent = 'Decodifica foto in corso...';
+
+  const fileScanner = new Html5Qrcode("reader", {
+    formatsToSupport: BARCODE_FORMATS,
+    verbose: false,
+  });
+  try {
+    const decodedText = await fileScanner.scanFile(file, false);
+    await fileScanner.clear();
+    readerDiv.classList.add('hidden');
+    lookupBarcode(decodedText);
+  } catch (err) {
+    await fileScanner.clear().catch(() => {});
+    readerDiv.classList.add('hidden');
+    hideResult();
+    alert('Non sono riuscito a leggere il barcode dalla foto. Riprova tenendo il codice ben dritto, a fuoco e senza riflessi, oppure usa "Inserisci a mano".');
   }
 }
 
